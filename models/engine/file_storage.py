@@ -9,15 +9,20 @@ class FileStorage:
     __objects = {}
 
     def all(self, cls=None):
-        """returns the list of objects of one type of class"""
-        needed_cls = {}
+        """Returns a list of objects of one type of class.
 
-        if cls:
-            for obj_key, objs in FileStorage.__objects.items():
-                if type(objs) == cls:
-                    needed_cls[obj_key] = objs
-            return needed_cls
-        return FileStorage.__objects
+        Args:
+            cls (any, optional): Class of object. Defaults to None.
+
+        Returns:
+            list: list of objects of one type of class.
+        """
+        if cls is None:
+            return FileStorage.__objects
+        return {
+            key: value for key, value in self.__objects.items()
+            if type(value) is cls
+        }
 
     def new(self, obj):
         """Adds new object to storage dictionary"""
@@ -32,21 +37,15 @@ class FileStorage:
                 temp[key] = val.to_dict()
             json.dump(temp, f)
 
-    def delete(self, obj=None):
-        """delete obj from __objects if it’s inside"""
-        if obj:
-            obj_key = f"{obj.__class__.__name__}.{obj.id}"
-            del FileStorage.__objects[obj_key]
-
     def reload(self):
         """Loads storage dictionary from file"""
-        from models.base_model import BaseModel
-        from models.user import User
-        from models.place import Place
-        from models.state import State
-        from models.city import City
         from models.amenity import Amenity
+        from models.base_model import BaseModel
+        from models.city import City
+        from models.place import Place
         from models.review import Review
+        from models.state import State
+        from models.user import User
 
         classes = {
             'BaseModel': BaseModel, 'User': User, 'Place': Place,
@@ -61,3 +60,21 @@ class FileStorage:
                     self.all()[key] = classes[val['__class__']](**val)
         except FileNotFoundError:
             pass
+
+    def delete(self, obj=None):
+        """Delete obj from __objects
+
+        If obj is equal to None, the method should not do anything.
+        Args:
+            obj (models.class.<any model>, optional): object to delete.
+            Defaults to None.
+        """
+        if obj in self.__objects.values():
+            key = "{}.{}".format(type(obj).__name__, obj.id)
+            del (self.__objects[key])
+        return
+
+    def close(self):
+        """Calls reload method for deserializing the JSON file to objects
+        """
+        self.reload()

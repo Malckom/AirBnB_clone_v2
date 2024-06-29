@@ -10,6 +10,14 @@ from models.state import State
 from models.city import City
 from models.amenity import Amenity
 from models.review import Review
+import shlex
+from os import environ
+
+classes = {
+    'BaseModel': BaseModel, 'User': User, 'Place': Place,
+    'State': State, 'City': City, 'Amenity': Amenity,
+    'Review': Review
+}
 
 
 class HBNBCommand(cmd.Cmd):
@@ -18,11 +26,6 @@ class HBNBCommand(cmd.Cmd):
     # determines prompt for interactive/non-interactive modes
     prompt = '(hbnb) ' if sys.__stdin__.isatty() else ''
 
-    classes = {
-        'BaseModel': BaseModel, 'User': User, 'Place': Place,
-        'State': State, 'City': City, 'Amenity': Amenity,
-        'Review': Review
-    }
     dot_cmds = ['all', 'count', 'show', 'destroy', 'update']
     types = {
         'number_rooms': int, 'number_bathrooms': int,
@@ -114,42 +117,32 @@ class HBNBCommand(cmd.Cmd):
         pass
 
     def do_create(self, args):
-        """Create an object of a specified class with given parameters."""
-        list_of_args = args.split()
+        """ Create an object of any class
 
-        if not list_of_args:
+        Command syntax: create <Class name> <param 1> <param 2> <param 3>...
+        Param syntax: <key name>=<value>
+        """
+        try:
+            if not args:
+                raise SyntaxError()
+            my_list = args.split(" ")
+            obj = eval("{}()".format(my_list[0]))
+            for attr in my_list[1:]:
+                my_att = attr.split('=')
+                try:
+                    casted = HBNBCommand.verify_attribute(my_att[1])
+                except Exception:
+                    continue
+                if not casted:
+                    continue
+                setattr(obj, my_att[0], casted)
+            # print(obj)
+            storage.save()
+            print("{}".format(obj.id))
+        except SyntaxError:
             print("** class name missing **")
-            return
-        if list_of_args[0] not in HBNBCommand.classes:
+        except NameError as e:
             print("** class doesn't exist **")
-            return
-
-        new_instance = HBNBCommand.classes[list_of_args[0]]()
-
-        # iterate over the remaining args (attr="value")
-        for idx, attr in enumerate(list_of_args[1:], 1):
-            # split into attr name & value, grab by idx ('attr', '=', 'val')
-            obj_attr = list_of_args[idx].partition("=")
-            attr_name, value = obj_attr[0], obj_attr[2]
-
-            # handle quoted attribute value and underscore
-            if '\"' in value:
-                value = value[1:-1].replace('_', ' ')
-            # handle digits as int and value with dot as float
-            if '.' in value:
-                try:
-                    value = float(value)
-                except ValueError:
-                    pass
-            else:
-                try:
-                    value = int(value)
-                except ValueError:
-                    pass
-            if hasattr(new_instance, attr_name):
-                setattr(new_instance, attr_name, value)
-        storage.save()
-        print(new_instance.id)
 
     def help_create(self):
         """ Help information for the create method """
@@ -222,23 +215,23 @@ class HBNBCommand(cmd.Cmd):
         print("Destroys an individual instance of a class")
         print("[Usage]: destroy <className> <objectId>\n")
 
-    def do_all(self, args):
+    def do_all(self, arg):
         """ Shows all objects, or all objects of a class"""
-        print_list = []
 
-        if args:
-            args = args.split(' ')[0]  # remove possible trailing args
-            if args not in HBNBCommand.classes:
-                print("** class doesn't exist **")
-                return
-            for k, v in storage.all(args).items():
-                if k.split('.')[0] == args:
-                    print_list.append(str(v))
+        args = shlex.split(arg)
+        obj_list = []
+        if len(args) == 0:
+            obj_dict = storage.all()
+        elif args[0] in classes:
+            obj_dict = storage.all(classes[args[0]])
         else:
-            for k, v in storage.all().items():
-                print_list.append(str(v))
-
-            print(print_list)
+            print("** class doesn't exist **")
+            return False
+        for key in obj_dict:
+            obj_list.append(str(obj_dict[key]))
+        print("[", end="")
+        print(", ".join(obj_list), end="")
+        print("]")
 
     def help_all(self):
         """ Help information for the all command """
@@ -344,6 +337,38 @@ class HBNBCommand(cmd.Cmd):
         """ Help information for the update class """
         print("Updates an object with new information")
         print("Usage: update <className> <id> <attName> <attVal>\n")
+
+    @classmethod
+    def verify_attribute(cls, attribute):
+        """verifies that an attribute is correctly formatted
+
+        Args:
+            attribute (any): attribute to be verified.
+
+        Returns:
+            any: attribute.
+        """
+        if attribute[0] is attribute[-1] == '"':
+            for i, c in enumerate(attribute[1:-1]):
+                if c == '"' and attribute[i] != '\\':
+                    return None
+                if c == " ":
+                    return None
+            return attribute.strip('"').replace('_', ' ').replace("\\\"", "\"")
+        else:
+            flag = 0
+            allowed = "0123456789.-"
+            for c in attribute:
+                if c not in allowed:
+                    return None
+                if c == '.' and flag == 1:
+                    return None
+                elif c == '.' and flag == 0:
+                    flag = 1
+            if flag == 1:
+                return float(attribute)
+            else:
+                return int(attribute)
 
 
 if __name__ == "__main__":
