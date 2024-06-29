@@ -136,8 +136,8 @@ class HBNBCommand(cmd.Cmd):
                 if not casted:
                     continue
                 setattr(obj, my_att[0], casted)
-            print(obj)
-            # obj.save()
+            # print(obj)
+            storage.save()
             print("{}".format(obj.id))
         except SyntaxError:
             print("** class name missing **")
