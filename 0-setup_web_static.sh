@@ -1,52 +1,27 @@
 #!/usr/bin/env bash
-# sets up my web servers for the deployment of web_static.
+# script that sets up web servers for the deployment of web_static
+sudo apt-get update
+sudo apt-get -y install nginx
+sudo ufw allow 'Nginx HTTP'
 
-# installs nginx if it is not already installed
-if [[ ! -x ${/usr/sbin/nginx} ]];
-then
-    sudo apt-get -y update
-    sudo apt-get install -y nginx
-fi
-
-# create directories if they doesnt exist
-if [[ ! -d ${/data/web_static/releases/test/} ]];
-then
-    sudo mkdir -p /data/web_static/releases/test/
-fi
-
-if [[ ! -d ${/data/web_static/} ]];
-then
-    sudo mkdir -p /data/web_static/shared/
-fi
-
-# fake html content to test nginx config
-echo "
-<html>
+sudo mkdir -p /data/
+sudo mkdir -p /data/web_static/
+sudo mkdir -p /data/web_static/releases/
+sudo mkdir -p /data/web_static/shared/
+sudo mkdir -p /data/web_static/releases/test/
+sudo touch /data/web_static/releases/test/index.html
+sudo echo "<html>
   <head>
   </head>
   <body>
     Holberton School
   </body>
-</html>" | sudo tee /data/web_static/releases/test/index.html > /dev/null
+</html>" | sudo tee /data/web_static/releases/test/index.html
 
-# sym-link to html content directory (test). if exists, replace with new one
-ln -nsf /data/web_static/releases/test/ /data/web_static/current
+sudo ln -s -f /data/web_static/releases/test/ /data/web_static/current
 
-# give ownership of /data/ to the host user and group
-chown -R ubuntu:ubuntu /data/
+sudo chown -R ubuntu:ubuntu /data/
 
-# serve the content of /data/web_static/current/ to hbnb_static
+sudo sed -i '/listen 80 default_server/a location /hbnb_static { alias /data/web_static/current/;}' /etc/nginx/sites-enabled/default
 
-echo "
-server {
-        listen 80;
-        listen [::]:80;
-
-        location /hbnb_static {
-          alias /data/web_static/current/;
-        }
-        add_header X-Served-By $HOSTNAME;
-
-}" | sudo tee /etc/nginx/sites-enabled/default > /dev/null
-
-sudo service nginx start
+sudo service nginx restart
